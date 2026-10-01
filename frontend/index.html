@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Foundry — turn assumptions into evidence, evidence into decisions</title>
+<meta name="description" content="Foundry is an entrepreneurial experimentation lab. An idea is a hypothesis. Foundry turns assumptions into experiments, experiments into evidence, and evidence into a decision. Powered by Claude on Amazon Bedrock.">
+<link rel="stylesheet" href="./style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='48' font-size='48'>⚗️</text></svg>">
+<!-- Three.js for the 3D landing globe -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.min.js" defer></script>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<!-- Landing topbar — minimal, no app nav -->
+<header class="topbar topbar--landing" id="landingTopbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-text">Found<strong>ry</strong></span>
+  </div>
+  <div class="topbar-right">
+    <div class="auth-area" id="authAreaLanding"></div>
+    <button class="btn-ghost btn-sm" id="aboutBtnLanding" type="button">About</button>
+  </div>
+</header>
+
+<!-- App topbar — shown only after entering workspace -->
+<header class="topbar topbar--app" id="appTopbar" hidden>
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-text">Found<strong>ry</strong></span>
+  </div>
+
+  <nav class="mainnav" id="mainNav" aria-label="Sections">
+    <button class="navlink is-active" data-tab="pitch"        id="nav-pitch"        type="button">Workspace</button>
+    <button class="navlink" data-tab="assumptions"             id="nav-assumptions"  type="button">Assumption Board <span class="badge" id="navBoardCount">0</span></button>
+    <button class="navlink" data-tab="council"                 id="nav-council"      type="button">Founder Council</button>
+    <button class="navlink" data-tab="decision"                id="nav-decision"     type="button">Decision</button>
+    <button class="navlink" data-tab="battle"                  id="nav-battle"       type="button">Battle</button>
+    <button class="navlink" data-tab="vault"                   id="nav-vault"        type="button">Vault <span class="badge" id="vaultCount">0</span></button>
+    <button class="navlink" data-tab="community"               id="nav-community"    type="button">Community</button>
+  </nav>
+
+  <div class="topbar-right">
+    <span class="engine-pill" id="enginePill" title="Which evaluation engine is live">
+      <span class="dot" aria-hidden="true"></span><span id="engineLabel">checking…</span>
+    </span>
+    <button class="btn-ghost btn-sm" id="settingsBtn" type="button">Settings</button>
+    <div class="auth-area" id="authArea"></div>
+    <button class="btn-ghost btn-sm" id="aboutBtn" type="button">About</button>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ─────────────────────── Rich Landing Page ─────────────────────────── -->
+  <section class="hero" id="hero">
+
+    <!-- Particle / 3D canvas backdrop -->
+    <canvas id="heroCanvas" class="hero-canvas" aria-hidden="true"></canvas>
+
+    <!-- Floating 3D feature orbs (CSS-only 3D on fallback) -->
+    <div class="orb-field" aria-hidden="true">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+    </div>
+
+    <div class="hero-inner">
+      <p class="kicker">
+        <span class="kicker-badge">⚗️ Entrepreneurial Experimentation Lab</span>
+      </p>
+      <h1>
+        Turn your startup idea<br>
+        into <em>evidence-backed</em><br>
+        decisions.
+      </h1>
+      <p class="lede">
+        Submit a hypothesis. Get a risk-rated assumption board, a five-seat founder council,
+        a unit-economics audit, and an explicit
+        <strong class="verdict-word proceed">PROCEED</strong>,
+        <strong class="verdict-word pivot">PIVOT</strong>, or
+        <strong class="verdict-word perish">PERISH</strong> call.
+        Powered by <strong>Claude on Amazon Bedrock</strong>.
+      </p>
+
+      <div class="hero-cta">
+        <button class="btn-primary btn-hero" id="startBtn" type="button">
+          <span class="btn-icon" aria-hidden="true">🚀</span> Enter the workspace
+        </button>
+        <button class="btn-ghost btn-hero" id="sampleBtn" type="button">
+          <span class="btn-icon" aria-hidden="true">🔬</span> See a live demo
+        </button>
+      </div>
+
+      <!-- Social proof strip -->
+      <div class="hero-proof">
+        <div class="proof-item">
+          <span class="proof-num">12</span>
+          <span class="proof-label">assumption types tested</span>
+        </div>
+        <div class="proof-sep" aria-hidden="true"></div>
+        <div class="proof-item">
+          <span class="proof-num">5</span>
+          <span class="proof-label">founder perspectives</span>
+        </div>
+        <div class="proof-sep" aria-hidden="true"></div>
+        <div class="proof-item">
+          <span class="proof-num">3</span>
+          <span class="proof-label">verdicts: PROCEED / PIVOT / PERISH</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature cards row -->
+    <div class="feature-row">
+      <article class="feature-card" style="--fc-hue: 220">
+        <div class="feature-icon" aria-hidden="true">🧪</div>
+        <h3>Assumption Board</h3>
+        <p>Every claim in your pitch becomes a falsifiable experiment across Desirability, Viability, and Feasibility.</p>
+      </article>
+      <article class="feature-card" style="--fc-hue: 30">
+        <div class="feature-icon" aria-hidden="true">🧠</div>
+        <h3>Founder Council</h3>
+        <p>Five seats — Strategist, CFO, Validator, Builder, Skeptic. Each reads the same board and gives you their honest take.</p>
+      </article>
+      <article class="feature-card" style="--fc-hue: 150">
+        <div class="feature-icon" aria-hidden="true">📊</div>
+        <h3>Unit Economics Audit</h3>
+        <p>Contribution margin, CAC payback, and an explicit verdict computed locally — the model never does your arithmetic.</p>
+      </article>
+      <article class="feature-card" style="--fc-hue: 260">
+        <div class="feature-icon" aria-hidden="true">⚡</div>
+        <h3>Claude on Bedrock</h3>
+        <p>Evaluations via the Amazon Bedrock Converse API. Falls back to a deterministic engine if the model is unreachable.</p>
+      </article>
+      <article class="feature-card" style="--fc-hue: 0">
+        <div class="feature-icon" aria-hidden="true">⚔️</div>
+        <h3>Battle Arena</h3>
+        <p>Put two saved concepts head-to-head. One wins on risk-adjusted collectability, not on which story sounds nicer.</p>
+      </article>
+      <article class="feature-card" style="--fc-hue: 180">
+        <div class="feature-icon" aria-hidden="true">🌍</div>
+        <h3>Community Board</h3>
+        <p>Publish your pitch for other founders to see. Backed by DynamoDB and Amazon Cognito sign-in.</p>
+      </article>
+    </div>
+
+    <!-- How it works timeline -->
+    <div class="how-it-works">
+      <h2 class="section-heading">How Foundry works</h2>
+      <ol class="timeline" role="list">
+        <li class="timeline-step">
+          <div class="timeline-node" aria-hidden="true"><span>1</span></div>
+          <div class="timeline-content">
+            <h4>Submit a hypothesis</h4>
+            <p>Describe your startup: name, sector, target audience, pricing, and team skills. The more specific, the sharper the output.</p>
+          </div>
+        </li>
+        <li class="timeline-step">
+          <div class="timeline-node" aria-hidden="true"><span>2</span></div>
+          <div class="timeline-content">
+            <h4>Get your assumption board</h4>
+            <p>Claude on Bedrock builds 12 risk-rated falsifiable claims across Desirability, Viability, and Feasibility. Mark them as you test.</p>
+          </div>
+        </li>
+        <li class="timeline-step">
+          <div class="timeline-node" aria-hidden="true"><span>3</span></div>
+          <div class="timeline-content">
+            <h4>Face the council</h4>
+            <p>Five founder archetypes critique your board from different angles. Answer the investor Q&amp;A to move your investability score in real time.</p>
+          </div>
+        </li>
+        <li class="timeline-step">
+          <div class="timeline-node" aria-hidden="true"><span>4</span></div>
+          <div class="timeline-content">
+            <h4>Get the call</h4>
+            <p>The Decision engine reads your evidence and gives you an explicit <strong>PROCEED</strong>, <strong>PIVOT</strong>, or <strong>PERISH</strong> with the reasoning behind it.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <!-- AWS stack badge strip -->
+    <div class="aws-strip">
+      <p class="aws-strip-label">Built on AWS</p>
+      <div class="aws-badges">
+        <span class="aws-badge">Amazon Bedrock</span>
+        <span class="aws-badge">Claude Sonnet</span>
+        <span class="aws-badge">AWS Lambda</span>
+        <span class="aws-badge">Amazon DynamoDB</span>
+        <span class="aws-badge">Amazon Cognito</span>
+        <span class="aws-badge">Amazon CloudFront</span>
+        <span class="aws-badge">Amazon S3</span>
+      </div>
+    </div>
+
+    <!-- Bottom CTA -->
+    <div class="hero-bottom-cta">
+      <p class="bottom-cta-tagline">Your idea is a hypothesis. <em>Start testing it.</em></p>
+      <button class="btn-primary btn-hero" id="startBtn2" type="button">
+        <span class="btn-icon" aria-hidden="true">🚀</span> Enter the workspace — it's free
+      </button>
+    </div>
+
+  </section>
+
+  <!-- ───────────────────────────── App shell ───────────────────────────── -->
+  <div class="app" id="app" hidden>
+
+    <!-- ── Workspace (Pitch Arena) ── -->
+    <section role="tabpanel" id="panel-pitch" aria-labelledby="nav-pitch" class="panel is-active">
+
+      <form class="card form" id="pitchForm" novalidate>
+        <h2>Your hypothesis</h2>
+        <p class="form-hint">The more specific you are, the sharper the board and the more honest the call.</p>
+
+        <div class="grid-2">
+          <label class="field">
+            <span>Startup name</span>
+            <input name="name" id="f-name" type="text" maxlength="120" placeholder="e.g. Shewa Logistics" required>
+          </label>
+          <label class="field">
+            <span>Sector</span>
+            <input name="sector" id="f-sector" type="text" maxlength="80" list="sectors" placeholder="e.g. Fintech" required>
+            <datalist id="sectors">
+              <option>Fintech</option><option>Agritech</option><option>Healthtech</option>
+              <option>Logistics</option><option>Edtech</option><option>Cleantech</option>
+              <option>E-commerce</option><option>SaaS</option><option>Creator tools</option>
+            </datalist>
+          </label>
+        </div>
+
+        <label class="field">
+          <span>Target audience</span>
+          <input name="market" id="f-market" type="text" maxlength="120" placeholder="e.g. independent retailers in your city" required>
+        </label>
+
+        <label class="field">
+          <span>The hypothesis <small id="pitchCount">0 / 4000</small></span>
+          <textarea name="pitch" id="f-pitch" rows="6" maxlength="4000" required
+            placeholder="What breaks today, who feels it, and what you charge to fix it. Name the payment rail if you know it."></textarea>
+        </label>
+
+        <fieldset class="field">
+          <legend>Skills already on the team</legend>
+          <div class="chips" id="skillChips">
+            <label class="chip"><input type="checkbox" value="engineering"> Engineering</label>
+            <label class="chip"><input type="checkbox" value="design"> Design</label>
+            <label class="chip"><input type="checkbox" value="growth"> Growth / Sales</label>
+            <label class="chip"><input type="checkbox" value="finance"> Finance / Ops</label>
+            <label class="chip"><input type="checkbox" value="domain"> Domain expert</label>
+            <label class="chip"><input type="checkbox" value="product"> Product</label>
+          </div>
+        </fieldset>
+
+        <details class="econ">
+          <summary>Pricing model &amp; unit economics <span class="optional">optional — but this is what changes the call</span></summary>
+          <div class="grid-3">
+            <label class="field">
+              <span>Price per unit</span>
+              <input name="price" id="f-price" type="number" min="0" step="any" inputmode="decimal" placeholder="250">
+            </label>
+            <label class="field">
+              <span>COGS per unit</span>
+              <input name="cogs" id="f-cogs" type="number" min="0" step="any" inputmode="decimal" placeholder="180">
+            </label>
+            <label class="field">
+              <span>CAC</span>
+              <input name="cac" id="f-cac" type="number" min="0" step="any" inputmode="decimal" placeholder="400">
+            </label>
+          </div>
+          <p class="form-hint">Same currency for all three. We compute contribution margin and CAC payback locally — the model never does your arithmetic.</p>
+        </details>
+
+        <div class="form-actions">
+          <button class="btn-primary" id="analyzeBtn" type="submit">Build the board</button>
+          <button class="btn-ghost" id="resetBtn" type="reset">Clear</button>
+        </div>
+        <p class="form-error" id="formError" role="alert" hidden></p>
+      </form>
+
+      <!-- Results -->
+      <div id="results" hidden>
+
+        <div class="card verdict">
+          <div class="verdict-head">
+            <h2 id="resultName">—</h2>
+            <span class="engine-tag" id="resultEngine"></span>
+          </div>
+          <blockquote class="roast" id="roast"></blockquote>
+          <p class="takeaway"><strong>Deal-memo line:</strong> <span id="vcTakeaway"></span></p>
+          <div class="form-actions">
+            <button class="btn-ghost btn-sm" id="gotoBoardBtn" type="button">Open assumption board</button>
+            <button class="btn-ghost btn-sm" id="gotoCouncilBtn" type="button">Open founder council</button>
+            <button class="btn-ghost btn-sm" id="gotoDecisionBtn" type="button">Open decision</button>
+          </div>
+        </div>
+
+        <!-- KPI row: three stat tiles, each with a severity meter -->
+        <div class="kpi-row" id="kpiRow"></div>
+
+        <div class="card econ-card" id="econCard">
+          <h3>Unit-economics audit</h3>
+          <div class="econ-figures" id="econFigures"></div>
+          <p class="econ-note" id="econNote"></p>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <h3>Market potential</h3>
+            <p id="marketPotential"></p>
+          </div>
+          <div class="card">
+            <h3>How this collects cash</h3>
+            <p id="monetization"></p>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <h3>Risks</h3>
+            <ul class="list" id="risks"></ul>
+          </div>
+          <div class="card">
+            <h3>Do this next</h3>
+            <ul class="list" id="suggestions"></ul>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>30-day validation plan</h3>
+          <ol class="roadmap" id="roadmap"></ol>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <h3>Already crowded</h3>
+            <p id="crowded"></p>
+          </div>
+          <div class="card">
+            <h3>Still open</h3>
+            <p id="opportunity"></p>
+          </div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <h3>Missing from your team</h3>
+            <ul class="list" id="missingSkills"></ul>
+          </div>
+          <div class="card">
+            <h3>Scaling reality</h3>
+            <p id="regionalAnalysis"></p>
+          </div>
+        </div>
+
+        <!-- Investor Q&A simulator -->
+        <div class="card investor" id="investorCard">
+          <h3>Investor Q&amp;A simulator</h3>
+          <p class="form-hint">Answer well and your investability rises. Hand-wave and it falls.</p>
+          <blockquote class="question" id="investorQuestion"></blockquote>
+          <label class="field">
+            <span class="sr-only">Your answer</span>
+            <textarea id="investorAnswer" rows="4" maxlength="2000"
+              placeholder="Numbers, named rails, and a claim someone could check. Not vision."></textarea>
+          </label>
+          <div class="form-actions">
+            <button class="btn-primary" id="answerBtn" type="button">Submit answer</button>
+            <button class="btn-ghost" id="dictateBtn" type="button" hidden>🎤 Dictate</button>
+          </div>
+          <div class="critique" id="critique" hidden></div>
+        </div>
+
+        <div class="card actions-card">
+          <h3>Keep this evaluation</h3>
+          <div class="form-actions">
+            <button class="btn-primary" id="saveVaultBtn" type="button">Save to Vault</button>
+            <button class="btn-ghost" id="publishBtn" type="button">Publish to Community</button>
+            <button class="btn-ghost" id="downloadBtn" type="button">Download JSON</button>
+          </div>
+          <p class="form-hint" id="actionNote"></p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── Assumption Board ── -->
+    <section role="tabpanel" id="panel-assumptions" aria-labelledby="nav-assumptions" class="panel" hidden>
+      <div class="card">
+        <div class="board-head">
+          <div>
+            <h2>Assumption Board</h2>
+            <p class="form-hint" id="boardHint">Build the board from a hypothesis in the Workspace. Every claim is falsifiable — test it, then record what happened.</p>
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary btn-sm" id="boardReanalyseBtn" type="button">Re-analyse hypothesis</button>
+            <button class="btn-ghost btn-sm" id="boardResetBtn" type="button">Reset evidence</button>
+          </div>
+        </div>
+        <div class="board-summary" id="boardSummary" hidden></div>
+      </div>
+      <div class="board-columns" id="boardColumns"></div>
+      <div class="card empty-board" id="boardEmpty">
+        <p>No board yet. Head to the Workspace and build one from your hypothesis.</p>
+        <div class="form-actions"><button class="btn-ghost btn-sm" id="boardToWorkspace" type="button">Go to Workspace</button></div>
+      </div>
+    </section>
+
+    <!-- ── Founder Council ── -->
+    <section role="tabpanel" id="panel-council" aria-labelledby="nav-council" class="panel" hidden>
+      <div class="card">
+        <div class="board-head">
+          <div>
+            <h2>Founder Council</h2>
+            <p class="form-hint">Five seats, five agendas: Strategist, CFO, Validator, Builder, Skeptic. They all read the same board.</p>
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary btn-sm" id="councilRefreshBtn" type="button">Re-run council</button>
+            <span class="engine-tag" id="councilEngine"></span>
+          </div>
+        </div>
+        <p class="form-hint" id="councilNote"></p>
+      </div>
+      <div class="council-grid" id="councilGrid"></div>
+      <div class="card empty-board" id="councilEmpty">
+        <p>No council yet. Build the board first — the council critiques your assumptions, not a blank page.</p>
+        <div class="form-actions"><button class="btn-ghost btn-sm" id="councilToWorkspace" type="button">Go to Workspace</button></div>
+      </div>
+    </section>
+
+    <!-- ── Decision ── -->
+    <section role="tabpanel" id="panel-decision" aria-labelledby="nav-decision" class="panel" hidden>
+      <div class="card decision-hero" id="decisionHero"></div>
+      <div class="two-col">
+        <div class="card">
+          <h3>What is driving the call</h3>
+          <ul class="list" id="decisionDrivers"></ul>
+        </div>
+        <div class="card">
+          <h3>Next moves</h3>
+          <ol class="list numbered" id="decisionSteps"></ol>
+        </div>
+      </div>
+      <div class="card empty-board" id="decisionEmpty">
+        <p>No evidence yet. Validate or invalidate assumptions on the board and the call updates itself.</p>
+        <div class="form-actions"><button class="btn-ghost btn-sm" id="decisionToBoard" type="button">Go to Assumption Board</button></div>
+      </div>
+    </section>
+
+    <!-- ── Battle Arena ── -->
+    <section role="tabpanel" id="panel-battle" aria-labelledby="nav-battle" class="panel" hidden>
+      <div class="card">
+        <h2>Battle Arena</h2>
+        <p class="form-hint">Pick two saved concepts. One wins on risk-adjusted collectability, not on which story is nicer.</p>
+        <div class="grid-2">
+          <label class="field"><span>Concept A</span><select id="battleA"></select></label>
+          <label class="field"><span>Concept B</span><select id="battleB"></select></label>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" id="battleBtn" type="button">Fight</button>
+        </div>
+        <p class="form-error" id="battleError" role="alert" hidden></p>
+      </div>
+      <div id="battleResult" hidden></div>
+    </section>
+
+    <!-- ── Vault ── -->
+    <section role="tabpanel" id="panel-vault" aria-labelledby="nav-vault" class="panel" hidden>
+      <div class="card">
+        <h2>Vault</h2>
+        <p class="form-hint">Stored in this browser only (localStorage). Nothing leaves your device until you publish.</p>
+      </div>
+      <div id="vaultList" class="vault-list"></div>
+    </section>
+
+    <!-- ── Community ── -->
+    <section role="tabpanel" id="panel-community" aria-labelledby="nav-community" class="panel" hidden>
+      <div class="card">
+        <h2>Community board</h2>
+        <p class="form-hint">Pitches other founders chose to publish. Stored in DynamoDB. <span id="storageMode" class="mono"></span></p>
+        <div class="form-actions">
+          <button class="btn-ghost" id="refreshCommunityBtn" type="button">Refresh</button>
+        </div>
+      </div>
+      <div id="communityList" class="vault-list"></div>
+    </section>
+
+  </div>
+</main>
+
+<!-- About dialog -->
+<dialog id="aboutDialog" class="dialog">
+  <h2>About Foundry</h2>
+  <p>
+    An entrepreneurial experimentation lab. A hypothesis goes in; a risk-rated assumption
+    board, a five-seat founder council, and an explicit PROCEED / PIVOT / PERISH call come out.
+  </p>
+  <h3>How it runs on AWS</h3>
+  <ul class="list">
+    <li><strong>Amazon Cognito</strong> — sign-in through the Hosted UI. The API verifies the ID token before attributing a post to you.</li>
+    <li><strong>Claude on Amazon Bedrock</strong> — evaluations via the Converse API with forced tool-use, so every response has the same structure and scores stay comparable.</li>
+    <li><strong>AWS Lambda</strong> — the API, behind a Function URL.</li>
+    <li><strong>Amazon DynamoDB</strong> — the published community board.</li>
+    <li><strong>Amazon S3 + CloudFront</strong> — this frontend, over HTTPS, same origin as the API.</li>
+  </ul>
+  <p class="form-hint">
+    Arithmetic is computed locally, never by the model, and the assumption board and decision are
+    deterministic. If Bedrock is unreachable the app degrades to the local engine rather than
+    failing — the engine in use is always shown in the header. Add your own OpenAI, Anthropic, or
+    OpenRouter key in Settings to re-run the council on a model you already pay for.
+  </p>
+  <div class="form-actions"><button class="btn-primary" id="aboutClose" type="button">Close</button></div>
+</dialog>
+
+<!-- Settings dialog (BYOK) -->
+<dialog id="settingsDialog" class="dialog">
+  <h2>Engine &amp; API keys</h2>
+  <p class="form-hint">
+    Foundry runs on Amazon Bedrock by default. Add your own key to re-run the Founder Council on a
+    model you already pay for. Keys are stored in this browser only and sent only to this app's own
+    API — never logged, never persisted server-side.
+  </p>
+
+  <fieldset class="field">
+    <legend>Evaluation engine</legend>
+    <div class="chips" id="modeChips">
+      <label class="chip"><input type="radio" name="engineMode" value="default"> AWS Bedrock / default engine</label>
+      <label class="chip"><input type="radio" name="engineMode" value="byok"> Bring your own key</label>
+    </div>
+  </fieldset>
+
+  <div id="byokFields" hidden>
+    <label class="field">
+      <span>Provider</span>
+      <select id="byokProvider">
+        <option value="anthropic">Anthropic</option>
+        <option value="openai">OpenAI</option>
+        <option value="openrouter">OpenRouter</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>API key</span>
+      <input id="byokKey" type="password" autocomplete="off" spellcheck="false" placeholder="paste your key">
+    </label>
+    <label class="field">
+      <span>Model <small>optional — provider default if blank</small></span>
+      <input id="byokModel" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. claude-sonnet-4-5">
+    </label>
+  </div>
+
+  <p class="form-hint" id="settingsStatus"></p>
+  <div class="form-actions">
+    <button class="btn-primary" id="settingsSave" type="button">Save</button>
+    <button class="btn-ghost" id="settingsClear" type="button">Clear keys</button>
+    <button class="btn-ghost" id="settingsClose" type="button">Close</button>
+  </div>
+</dialog>
+
+<!-- Auth dialog (guest fallback / Cognito sign-in) -->
+<dialog id="authDialog" class="dialog">
+  <h2>Sign in</h2>
+  <p class="form-hint" id="authIntro">Loading sign-in options…</p>
+  <div id="cognitoBlock" hidden>
+    <button class="btn-primary" id="cognitoSignInBtn" type="button">Sign in with AWS</button>
+  </div>
+  <div id="guestFields">
+    <label class="field">
+      <span>Display name</span>
+      <input id="guestName" type="text" maxlength="80" autocomplete="name" placeholder="Your name">
+    </label>
+    <label class="field">
+      <span>Email <small>optional</small></span>
+      <input id="guestEmail" type="email" maxlength="160" autocomplete="email" placeholder="you@example.com">
+    </label>
+  </div>
+  <div class="form-actions">
+    <button class="btn-primary" id="guestContinue" type="button">Continue as guest</button>
+    <button class="btn-ghost" id="authCancel" type="button">Cancel</button>
+  </div>
+</dialog>
+
+<!-- Non-blocking operation status -->
+<div class="loading" id="loading" role="status" aria-live="polite" aria-atomic="true" hidden>
+  <div class="loading-box">
+    <div class="spinner" aria-hidden="true"></div>
+    <p id="loadingText">Consulting the investor…</p>
+  </div>
+</div>
+
+<footer class="footer">
+  <p>Foundry · Zero to Shipped 2026 · <span class="mono">#commercial-potential</span> <span class="mono">#startups</span></p>
+</footer>
+
+<script type="module" src="./app.js"></script>
+<script src="./hero3d.js" defer></script>
+</body>
+</html>

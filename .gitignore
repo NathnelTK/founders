@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build artifacts
+dist/
+
+# Local environment
+.env
+.env.local
+
+# AWS — never commit credentials. The evidence folder intentionally contains only
+# masked output (aws configure list masks all but the last 4 chars), but raw
+# credential files must never land in the repo.
+.aws/
+credentials
+*.pem
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*

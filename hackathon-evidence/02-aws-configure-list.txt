@@ -1,0 +1,5 @@
+﻿NAME       : VALUE                    : TYPE             : LOCATION
+profile    : <not set>                : None             : None
+access_key : ****************36DW     : login            : 
+secret_key : ****************nLsW     : login            : 
+region     : us-east-1                : config-file      : ~/.aws/config

@@ -1,0 +1,28 @@
+{
+  "name": "founder-arena-aws",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AWS-native Founder Arena for Zero to Shipped 2026 — startup stress-testing powered by Claude on Amazon Bedrock",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node backend/server.mjs",
+    "dev": "node backend/server.mjs",
+    "smoke:bedrock": "node backend/scripts/smoke-bedrock.mjs",
+    "evidence": "powershell -ExecutionPolicy Bypass -File scripts/capture-aws-evidence.ps1",
+    "bundle:lambda": "esbuild backend/lambda.mjs --bundle --platform=node --target=node20 --outfile=dist/lambda/index.mjs --format=esm --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "deploy": "powershell -ExecutionPolicy Bypass -File scripts/deploy.ps1",
+    "validate:infra": "aws cloudformation validate-template --template-body file://infra/template.yaml"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.699.0",
+    "@aws-sdk/client-dynamodb": "^3.699.0",
+    "@aws-sdk/lib-dynamodb": "^3.699.0",
+    "aws-jwt-verify": "^4.0.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

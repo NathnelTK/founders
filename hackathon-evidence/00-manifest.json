@@ -1,0 +1,52 @@
+﻿{
+    "capturedAt":  "2026-09-30T11:54:42Z",
+    "agent":  "Claude Code (Anthropic), model claude-opus-5",
+    "hackathon":  "Zero to Shipped - AWS Builder Center",
+    "project":  "Founder Arena",
+    "workstation":  "DESKTOP-35432AP",
+    "cliOnPath":  "C:\\Users\\PC\\AppData\\Local\\Programs\\Amazon\\AWSCLIV2\\aws.exe",
+    "commands":  [
+                     {
+                         "label":  "AWS CLI version",
+                         "file":  "03-aws-cli-version.txt",
+                         "command":  "aws --version",
+                         "exitCode":  0
+                     },
+                     {
+                         "label":  "Caller identity (STS)",
+                         "file":  "01-sts-get-caller-identity.json",
+                         "command":  "aws sts get-caller-identity --output json",
+                         "exitCode":  0
+                     },
+                     {
+                         "label":  "Credential config (masked)",
+                         "file":  "02-aws-configure-list.txt",
+                         "command":  "aws configure list",
+                         "exitCode":  0
+                     },
+                     {
+                         "label":  "Account information",
+                         "file":  "04-account-information.json",
+                         "command":  "aws account get-account-information --output json",
+                         "exitCode":  0
+                     },
+                     {
+                         "label":  "Bedrock foundation models",
+                         "file":  "05-bedrock-list-foundation-models.json",
+                         "command":  "aws bedrock list-foundation-models --region us-east-1 --by-provider anthropic --output json",
+                         "exitCode":  0
+                     },
+                     {
+                         "label":  "Bedrock inference profiles",
+                         "file":  "07-bedrock-inference-profiles.json",
+                         "command":  "aws bedrock list-inference-profiles --region us-east-1 --output json",
+                         "exitCode":  0
+                     },
+                     {
+                         "label":  "Enabled regions",
+                         "file":  "08-enabled-regions.json",
+                         "command":  "aws account list-regions --region-opt-status-contains ENABLED ENABLED_BY_DEFAULT --output json",
+                         "exitCode":  0
+                     }
+                 ]
+}

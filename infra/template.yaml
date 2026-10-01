@@ -1,0 +1,485 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >-
+  Foundry — an entrepreneurial experimentation lab. A hypothesis goes in; a risk-rated
+  assumption board, a five-seat founder council, and a PROCEED / PIVOT / PERISH call come out.
+  Static frontend on S3 behind CloudFront (OAC), API on a Lambda Function URL routed through
+  the same CloudFront distribution so the app is served from one HTTPS origin, Amazon Cognito
+  for founder sign-in, and a DynamoDB table for the published community board. Evaluations
+  call Claude on Amazon Bedrock; the function degrades to a deterministic engine if Bedrock is
+  unreachable, so the app stays available. Built for the Zero to Shipped 2026 hackathon.
+
+Metadata:
+  AWSToolsMetrics:
+    AWSAgentToolkit: aws-cloudformation@3
+
+  com.aws.cloudformation.Context:
+    why: >-
+      Single CloudFront distribution fronts both the static site and the API so judges get
+      one public HTTPS URL and the browser makes same-origin requests (no CORS preflight).
+    must:
+      - The API behaviour must be cache-disabled; evaluations are non-idempotent POSTs.
+      - The Lambda origin must not receive the viewer Host header, or the Function URL rejects it.
+
+Parameters:
+  BedrockModelId:
+    Type: String
+    Default: us.anthropic.claude-sonnet-5
+    Description: >-
+      Bedrock model or cross-region inference profile ID used for evaluations. The default
+      was verified ACTIVE in this account with `aws bedrock list-inference-profiles
+      --region us-east-1` and routes across us-east-1, us-east-2, us-west-2.
+    AllowedPattern: "^[a-zA-Z0-9][a-zA-Z0-9.:_-]{3,200}$"
+    ConstraintDescription: Must be a valid Bedrock model or inference profile identifier.
+
+  BedrockMaxTokens:
+    Type: Number
+    Default: 3000
+    MinValue: 256
+    MaxValue: 8192
+    Description: >-
+      Explicit max output tokens per Bedrock call. Set deliberately — an unset value
+      defaults to the model maximum and reserves far more quota than needed.
+
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 180, 365]
+    Description: CloudWatch Logs retention for the API function.
+
+  CallbackUrl:
+    Type: String
+    Default: "http://localhost:3000"
+    Description: >-
+      Public origin the Cognito Hosted UI returns to, and the allowed API origin. Defaults to
+      localhost so the first deploy succeeds; deploy.ps1 re-runs the stack with the CloudFront
+      URL once the distribution exists. This is a parameter rather than a reference to the
+      distribution on purpose: referencing it would make Cognito depend on CloudFront while the
+      Lambda's origin depends on Cognito, which CloudFormation rejects as a circular dependency.
+    AllowedPattern: "^https?://[a-zA-Z0-9.-]+(:[0-9]+)?$"
+    ConstraintDescription: Must be an http(s) origin with no trailing slash or path.
+
+Resources:
+
+  # ── Data ────────────────────────────────────────────────────────────────────
+
+  CommunityTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Published pitches are founder-authored content that must survive stack replacement.
+          Single partition ("BOARD") with a createdAt#id sort key keeps the board queryable
+          newest-first without a GSI at this scale.
+        must:
+          - Retain on delete and replace; this holds user-generated content.
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Project
+          Value: founder-arena
+
+  # ── Identity ────────────────────────────────────────────────────────────────
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Amazon Cognito holds founder identity. Email is the username and is verified by
+          Cognito; the API verifies the resulting ID token against this pool's JWKS before
+          attributing a published pitch, so a client cannot simply claim an identity.
+        must:
+          - "AdvancedSecurityMode is not set: it adds per-request cost and is optional here."
+          - DeletionPolicy Retain — accounts are user data and must survive a stack replace.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: !Sub "${AWS::StackName}-founders"
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: "OFF"
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 10
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      UserPoolTags:
+        Project: foundry
+
+  # Public client: no secret, because a browser cannot keep one.
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub "${AWS::StackName}-web"
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - implicit
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      SupportedIdentityProviders:
+        - COGNITO
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      CallbackURLs:
+        # The public origin, plus localhost so `npm start` stays usable.
+        - !Ref CallbackUrl
+        - !Sub "${CallbackUrl}/"
+        - "http://localhost:3000"
+        - "http://localhost:3000/"
+      LogoutURLs:
+        - !Ref CallbackUrl
+        - !Sub "${CallbackUrl}/"
+        - "http://localhost:3000"
+        - "http://localhost:3000/"
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      # Account ID keeps the globally-unique prefix stable and collision-free.
+      Domain: !Sub "foundry-${AWS::AccountId}"
+      UserPoolId: !Ref UserPool
+
+  # ── Static site bucket ──────────────────────────────────────────────────────
+
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Private bucket reached only through CloudFront OAC. No website hosting, no public
+          ACLs — CloudFront is the single entry point.
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      Tags:
+        - Key: Project
+          Value: founder-arena
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # Confused-deputy protection: only this distribution may read the bucket.
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${SiteBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}"
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: s3:*
+            Resource:
+              - !GetAtt SiteBucket.Arn
+              - !Sub "${SiteBucket.Arn}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: "false"
+
+  # ── API function ────────────────────────────────────────────────────────────
+
+  ApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${AWS::StackName}-api"
+      RetentionInDays: !Ref LogRetentionDays
+
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: logs
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt ApiLogGroup.Arn
+        - PolicyName: bedrock-invoke
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # Scoped to invoke only. Both foundation-model and inference-profile ARNs are
+              # needed: a cross-region profile fans out to the underlying model ARNs.
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:bedrock:*::foundation-model/*"
+                  - !Sub "arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/*"
+        - PolicyName: community-table
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt CommunityTable.Arn
+      Tags:
+        - Key: Project
+          Value: founder-arena
+
+  ApiFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Synchronously invoked through a Function URL only, so no DLQ is required — there is
+          no async event source that could silently drop an invocation.
+        must:
+          - Handler code is bundled to a single ESM file by `npm run bundle:lambda`.
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-api"
+      Runtime: nodejs20.x
+      Handler: index.handler
+      Role: !GetAtt ApiRole.Arn
+      MemorySize: 512
+      # Bedrock Converse with a forced tool call can take ~15-25s on a long pitch.
+      Timeout: 60
+      Architectures:
+        - arm64
+      Code:
+        ZipFile: |
+          export const handler = async () => ({
+            statusCode: 503,
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ error: "Placeholder. Run: npm run deploy" })
+          });
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref CommunityTable
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          BEDROCK_MAX_TOKENS: !Ref BedrockMaxTokens
+          COGNITO_USER_POOL_ID: !Ref UserPool
+          COGNITO_CLIENT_ID: !Ref UserPoolClient
+          COGNITO_DOMAIN: !Sub "${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"
+          ALLOWED_ORIGIN: !Ref CallbackUrl
+          NODE_OPTIONS: "--enable-source-maps"
+      Tags:
+        - Key: Project
+          Value: founder-arena
+    DependsOn: ApiLogGroup
+
+  ApiFunctionUrl:
+    Type: AWS::Lambda::Url
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          AuthType NONE is deliberate: the evaluation API is public by design, like the static
+          site in front of it. Founder identity is not enforced by the URL; the function itself
+          verifies a Cognito ID token when one is presented and attributes the post, otherwise
+          the request is anonymous. Traffic normally arrives through CloudFront.
+        must:
+          - "Identity is verified in the handler (hackathon-evidence documents the pool); moving to an API Gateway Cognito authorizer would harden it further."
+    Properties:
+      TargetFunctionArn: !GetAtt ApiFunction.Arn
+      AuthType: NONE
+      InvokeMode: BUFFERED
+
+  ApiUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ApiFunction.Arn
+      Action: lambda:InvokeFunctionUrl
+      Principal: "*"
+      FunctionUrlAuthType: NONE
+
+  # ── CDN ─────────────────────────────────────────────────────────────────────
+
+  SiteOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub "${AWS::StackName}-s3-oac"
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Metadata:
+      com.aws.cloudformation.Context:
+        why: >-
+          Two origins behind one distribution: S3 for the app shell, the Lambda Function URL
+          for /api/*. Same-origin means no CORS preflight and one URL for judges.
+        must:
+          - /api/* must use the CachingDisabled policy.
+          - /api/* must use AllViewerExceptHostHeader; forwarding the viewer Host breaks the Function URL.
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "${AWS::StackName} — Founder Arena"
+        DefaultRootObject: index.html
+        PriceClass: PriceClass_100
+        HttpVersion: http2and3
+        IPV6Enabled: true
+
+        Origins:
+          - Id: s3-site
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SiteOAC.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+
+          - Id: lambda-api
+            # Strip the scheme from the Function URL to get a bare hostname.
+            DomainName: !Select [2, !Split ["/", !GetAtt ApiFunctionUrl.FunctionUrl]]
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+              OriginReadTimeout: 60
+              OriginKeepaliveTimeout: 5
+
+        DefaultCacheBehavior:
+          TargetOriginId: s3-site
+          ViewerProtocolPolicy: redirect-to-https
+          Compress: true
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          # Managed-CachingOptimized
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: lambda-api
+            ViewerProtocolPolicy: https-only
+            Compress: true
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachedMethods: [GET, HEAD]
+            # Managed-CachingDisabled
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            # Managed-AllViewerExceptHostHeader
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+
+        CustomErrorResponses:
+          # Single-page app: unknown paths resolve to the shell, not an S3 error.
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+      Tags:
+        - Key: Project
+          Value: founder-arena
+
+Outputs:
+  LiveUrl:
+    Description: Public HTTPS URL for the app — this is the hackathon ship-gate link.
+    Value: !Sub "https://${SiteDistribution.DomainName}"
+
+  HealthUrl:
+    Description: Health endpoint reporting which evaluation engine is live.
+    Value: !Sub "https://${SiteDistribution.DomainName}/api/health"
+
+  SiteBucketName:
+    Description: S3 bucket holding the frontend; sync build output here.
+    Value: !Ref SiteBucket
+
+  ApiFunctionName:
+    Description: Lambda function name for code updates.
+    Value: !Ref ApiFunction
+
+  ApiFunctionUrl:
+    Description: Direct Function URL (normally reached through CloudFront).
+    Value: !GetAtt ApiFunctionUrl.FunctionUrl
+
+  DistributionId:
+    Description: CloudFront distribution ID, used for cache invalidation on deploy.
+    Value: !Ref SiteDistribution
+
+  CommunityTableName:
+    Description: DynamoDB table backing the community board.
+    Value: !Ref CommunityTable
+
+  UserPoolId:
+    Description: Cognito user pool holding founder identities.
+    Value: !Ref UserPool
+
+  UserPoolClientId:
+    Description: Public Cognito app client used by the browser (no secret).
+    Value: !Ref UserPoolClient
+
+  CognitoDomain:
+    Description: Cognito Hosted UI domain (used for sign-in and sign-out redirects).
+    Value: !Sub "${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com"

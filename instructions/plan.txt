@@ -1,0 +1,54 @@
+for the hackathon here is my idea i was thinking to recreate my project that i did years ago now i want to update it for the hackathon as required and add some features to make it more cool what do u think.
+
+**Founder Arena AI** is a gamified startup evaluation platform built for African tech founders to stress-test their business ideas before building. It combines witty, brutally honest AI feedback with hard-hitting financial audits and a simulated investor Q&A, helping founders in emerging markets validate concepts, refine pitch economics, and prepare for real venture capital meetings.
+
+### Stack
+
+- **Language(s):** JavaScript (vanilla ES modules), HTML5, CSS3
+- **Framework / runtime:** Client-side web application (no backend framework; uses Supabase for auth/data and Google Gemini API for AI evaluations)
+- **Notable libraries:** 
+  - Supabase JS SDK (authentication, persistent community data storage)
+  - Google Generative AI API (`gemini-2.5-flash`)
+  - Web Speech API (voice-to-text dictation)
+  - CSS custom properties (design system)
+
+## How it's organized
+
+```
+startup-foundation/
+├── index.html          # Main UI template: landing page, auth forms, app shell,
+│                       # Pitch Arena, Battle Arena, Idea Vault tabs
+├── style.css           # Glassmorphic design system with CSS variables,
+│                       # layouts (grid/flex), animations, responsive media queries
+├── app.js              # Application controller: form handling, tab switching,
+│                       # state management, Supabase auth, localStorage persistence
+├── ai-engine.js        # Intelligence core: evaluates pitches via Gemini API
+│                       # or local Heuristics Engine; generates roadmaps, scorecards,
+│                       # confidence meters, investor questions, regional expansion analysis
+├── CONTRIBUTING.md     # Dev setup and contribution guidelines
+└── README.md           # Product overview and feature descriptions
+```
+
+**How it fits together:** A founder submits a startup concept (name, sector, market, pitch, optional unit economics). The app dispatches this to the AI engine, which either calls the Google Gemini API (if a key is configured) or falls back to a deterministic local heuristics solver. The engine returns a structured JSON evaluation: a witty "roast," market potential, monetization strategy, risks, suggestions, a 30-day roadmap, market gaps, confidence meters, missing team skills, a hard investor question, regional scalability analysis, and scores (global rating, investability). Results display in an interactive dashboard with a Q&A simulator that adjusts the founder's investability score based on their strategic responses. Founders can also compare two ideas side-by-side in Battle Arena, archive concepts in their Idea Vault, and optionally publish pitches to the public community directory.
+
+## How to run it
+
+1. **Clone and start a local server:**
+   ```bash
+   git clone https://github.com/NathnelTK/startup-foundation.git
+   cd startup-foundation
+   python -m http.server 8000
+   ```
+   Then open `http://localhost:8000` in your browser.
+
+2. **(Optional) Configure Gemini API or other free apis like ollama **
+   - Obtain a free Google Gemini API key from [Google AI Studio](https://aistudio.google.com).
+   - Click **API Settings** in the app header and paste your key.
+   - The app runs offline (heuristics-only) if no key is provided.
+
+3. **Sign up / Sign in:**
+   - Use Supabase Auth (email/password) to create an account, or enter **Guest/Offline Demo Mode** to test immediately.
+
+4. **Submit a pitch:**
+   - Fill the Pitch Arena form (startup name, sector, market, team skills, optional unit economics).
+   - Click **Analyze Concept** to run the evaluation engine.
