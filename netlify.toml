@@ -1,0 +1,29 @@
+[build]
+  # No build command needed - we're serving static files
+  publish = "frontend"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  # SPA routing - serve index.html for all routes
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[functions]
+  # Netlify Functions directory
+  directory = "functions"
